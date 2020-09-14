@@ -63,6 +63,42 @@ def mRNA_len(starts, ends):
     return l
 
 
+def make_gene_dict(transcript_file, region):
+
+    start_time = time.time()
+    gene_dict = {}
+
+    # each key is a gene
+    for row in transcript_file:
+        if row[1] in region:
+            if row[7] not in gene_dict.keys():
+                gene_dict[row[7]] = {}
+                gene_dict[row[7]]['chr'] = row[1]
+                gene_dict[row[7]]['strand'] = row[2]
+                gene_dict[row[7]][row[0]] = {}
+                gene_dict[row[7]][row[0]]['starts'] = [int(x) for x in row[5].split(',')[:-1]]
+                gene_dict[row[7]][row[0]]['ends'] = [int(x) for x in row[6].split(',')[:-1]]
+                gene_dict[row[7]][row[0]]['length'] = mRNA_len(gene_dict[row[7]][row[0]]['starts'],
+                                                                    gene_dict[row[7]][row[0]]['ends'])
+                gene_dict[row[7]]['global_start'] = int(row[3])
+                gene_dict[row[7]]['global_end'] = int(row[4])
+            else:
+                gene_dict[row[7]][row[0]] = {}
+                gene_dict[row[7]][row[0]]['starts'] = [int(x) for x in row[5].split(',')[:-1]]
+                gene_dict[row[7]][row[0]]['ends'] = [int(x) for x in row[6].split(',')[:-1]]
+                gene_dict[row[7]][row[0]]['length'] = mRNA_len(gene_dict[row[7]][row[0]]['starts'],
+                                                                    gene_dict[row[7]][row[0]]['ends'])
+                if int(row[3]) < gene_dict[row[7]]['global_start']:
+                    gene_dict[row[7]]['global_start'] = int(row[3])
+                if int(row[4]) > gene_dict[row[7]]['global_end']:
+                    gene_dict[row[7]]['global_end'] = int(row[4])
+
+    print("Took {} seconds to construct the gene dict".format(time.time() - start_time))
+    print("Number of genes in the region of interest:", len(gene_dict.keys()))
+
+    return gene_dict
+
+
 def construct_library(gene_dict, counts):
     library = {}
     start_time = time.time()
@@ -104,7 +140,7 @@ def construct_library(gene_dict, counts):
                         # normalise to tpkm
                         library[sample][gene]['norm_factor'] += float(counts.at[sample, tr] / l)
 
-    #print("All samples calc in {} seconds".format(time.time() - start_time))
+    print("All samples calc in {} seconds".format(time.time() - start_time))
     return library
 
 
@@ -133,7 +169,7 @@ def exons(gene):
     return exons
 
 
-def train_test_sep(gene_dict, test_ratio):
+def train_test_sep_ratio(gene_dict, test_ratio):
 
     testN = int(test_ratio * len(gene_dict.keys()))
 
@@ -157,9 +193,30 @@ def train_test_sep(gene_dict, test_ratio):
     return (gene_dict, gene_dict_test)
 
 
-def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000):
+def train_test_sep_limit(gene_dict, limit):
+
+    genes_test = []
+    for key in gene_dict.keys():
+        l = gene_dict[key]['global_end'] - gene_dict[key]['global_start']
+        if l > limit:
+            genes_test.extend([key])
+    genes_test = np.array(genes_test)
+
+    gene_dict_test = {}
+    for gene in genes_test:
+        val = gene_dict.pop(gene)
+        gene_dict_test.update({gene: val})
+
+    return (gene_dict, gene_dict_test)
+
+
+def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='', long_from_train=False):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
+
+    if region:
+        if isinstance(region, list):
+            region = region[0]
 
     # normalise to cpm first ALRD NORM IN BATCH NORM R
     #F = counts.sum(axis=1) / 10 ** 6
@@ -169,7 +226,14 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000):
     library = construct_library(gene_dict, counts)
 
     for sample in library.keys():
-        with open(os.path.join(out_dir, sample + '.jsonl'), 'a') as f1:
+        if region:
+            if long_from_train:
+                filename = sample + '_' + region + '_long.jsonl'
+            else:
+                filename = sample + '_' + region + '.jsonl'
+        else:
+            filename = sample + '.jsonl'
+        with open(os.path.join(out_dir, filename), 'a') as f1:
             # genes
             for gene in library[sample].keys():
                 jsonl_dict = {}
@@ -184,8 +248,15 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000):
                 json.dump(jsonl_dict, f1)
                 f1.write('\n')
 
-    if not os.path.exists(os.path.join(out_dir, 'gene_dict.jsonl')):
-        with open(os.path.join(out_dir, 'gene_dict.jsonl'), 'a') as f2:
+    if region:
+        if long_from_train:
+            filename = 'gene_dict' + '_'  + region + '_long.jsonl'
+        else:
+            filename = 'gene_dict' + '_' + region + '.jsonl'
+    else:
+        filename = 'gene_dict.jsonl'
+    if not os.path.exists(os.path.join(out_dir, filename)):
+        with open(os.path.join(out_dir, filename), 'a') as f2:
             for gene in library[sample].keys():
                 gs = int(gene_dict[gene]['global_start'])
                 ge = int(gene_dict[gene]['global_end'])

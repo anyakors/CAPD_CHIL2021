@@ -2,7 +2,7 @@
 #    install.packages("BiocManager")
 #BiocManager::install(c("rhdf5", "dendextend", "sva", "edgeR", "preprocessCore"))
 
-#install.packages(c("tools", "corrplot", "DMwR2", "colorspace", "data.table"))
+#install.packages(c("tools", "corrplot", "colorspace", "data.table"))
 
 library("tools")#
 library("dendextend")#

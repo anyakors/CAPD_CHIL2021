@@ -18,9 +18,13 @@ parser.add_argument("-r", "--genome_region", help="Genome region to extract gene
                     type=str)
 parser.add_argument("-d", "--genes_to_keep", help="Genes to keep in the labels",
                     type=str)
-parser.add_argument("-t", "--test_ratio", help="Ratio (0 to 1) of data to test model on",
-                    type=float)
+#parser.add_argument("-t", "--test_ratio", help="Ratio (0 to 1) of data to test model on",
+#                    type=float)
+parser.add_argument("-gl", "--length_limit", help="Gene length limit: above this length -> testing batch",
+                    type=int)
 parser.add_argument("-c", "--context", help="Flanking ends lengths (context), on each side",
+                    type=int)
+parser.add_argument("-t", "--test", help="Whether it's a test chr or no",
                     type=int)
 parser.add_argument("-i", "--input", help="Count tables path",
                     type=str)
@@ -41,41 +45,10 @@ else:
 
 print("Genome region defined:", region)
 
-gene_dict = {}
-
-# Import GENCODE v34 & construct gene dict
 transcript_file = np.genfromtxt(args.gencode_list, usecols=(1, 2, 3, 4, 5, 9, 10, 12), skip_header=1, dtype='str')
 
-start_time = time.time()
-
-# each key is a gene
-for row in transcript_file:
-    if row[1] in region:
-        if row[7] not in gene_dict.keys():
-            gene_dict[row[7]] = {}
-            gene_dict[row[7]]['chr'] = row[1]
-            gene_dict[row[7]]['strand'] = row[2]
-            gene_dict[row[7]][row[0]] = {}
-            gene_dict[row[7]][row[0]]['starts'] = [int(x) for x in row[5].split(',')[:-1]]
-            gene_dict[row[7]][row[0]]['ends'] = [int(x) for x in row[6].split(',')[:-1]]
-            gene_dict[row[7]][row[0]]['length'] = mRNA_len(gene_dict[row[7]][row[0]]['starts'],
-                                                                gene_dict[row[7]][row[0]]['ends'])
-            gene_dict[row[7]]['global_start'] = int(row[3])
-            gene_dict[row[7]]['global_end'] = int(row[4])
-        else:
-            gene_dict[row[7]][row[0]] = {}
-            gene_dict[row[7]][row[0]]['starts'] = [int(x) for x in row[5].split(',')[:-1]]
-            gene_dict[row[7]][row[0]]['ends'] = [int(x) for x in row[6].split(',')[:-1]]
-            gene_dict[row[7]][row[0]]['length'] = mRNA_len(gene_dict[row[7]][row[0]]['starts'],
-                                                                gene_dict[row[7]][row[0]]['ends'])
-            if int(row[3]) < gene_dict[row[7]]['global_start']:
-                gene_dict[row[7]]['global_start'] = int(row[3])
-            if int(row[4]) > gene_dict[row[7]]['global_end']:
-                gene_dict[row[7]]['global_end'] = int(row[4])
-
-
-print("Took {} seconds to construct the gene dict".format(time.time() - start_time))
-print("Number of genes in the region of interest:", len(gene_dict.keys()))
+print("Processing", region)
+gene_dict = make_gene_dict(transcript_file, region)
 
 to_keep = pd.read_csv(args.genes_to_keep, sep=',', header=0, index_col=0)
 for key in list(gene_dict.keys()):
@@ -84,12 +57,13 @@ for key in list(gene_dict.keys()):
 
 print("Omitted genes with missing exon info (GENCODEv26), left:", len(gene_dict.keys()))
 
-gene_dict_train, gene_dict_test = train_test_sep(gene_dict, args.test_ratio)
+if args.test:
+    gene_dict_test = gene_dict
+    print("{} genes selected for testing".format(len(gene_dict_test)))
+else:
+    gene_dict_train, gene_dict_test = train_test_sep_limit(gene_dict, args.length_limit)
+    print("{} genes selected for training, {} for testing".format(len(gene_dict_train), len(gene_dict_test)))
 
-print("{} genes selected for training, {} for testing".format(len(gene_dict_train), len(gene_dict_test)))
-# need to download and unpack the genome file into the ./data directory:
-# wget --timestamping 'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz' -O hg38.fa.gz
-# gunzip hg38.fa.gz
 
 hg38 = {}
 
@@ -112,11 +86,15 @@ for file in dirs:
     if 'csv' in file:
         counts = pd.read_csv(os.path.join(args.input, file), sep=',', header=0, index_col=0, low_memory=False)
         print(file, '; shape:', np.shape(counts))
-        save_labels_jsonl(counts, gene_dict_train, hg38, args.out_train, args.context)
-        print('Saved .jsonl dicts for training in {} with {} label; one file = one sample'.format(args.out_train,
-                                                                                        file[:3]))
-        save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context)
-        print('Saved .jsonl dicts for testing in {} with {} label; one file = one sample'.format(args.out_test,
-                                                                                                  file[:3]))
+
+        if not args.test:
+            save_labels_jsonl(counts, gene_dict_train, hg38, args.out_train, args.context, region)
+            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region,
+                                      long_from_train=True)
+        else:
+            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region)
+
+        print('Saved .jsonl dicts for training/testing with {} label; one file = one sample'.format(file[:3]))
+
 
 time_to_human(time.time() - start_time)

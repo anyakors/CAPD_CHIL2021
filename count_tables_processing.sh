@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # has to be downloaded
-# javascript:downloadFile('https://mssm-seq-matrix.s3.amazonaws.com/human_matrix.h5','human_matrix.h5','8')
+# https://amp.pharm.mssm.edu/archs4/download.html
+# "Expression (transcript level) Human", human_transcript_v8.h5 file
 export ARCHS4_DATA=data/human_transcript_v8.h5
 export COUNTS_DIR=data/counts_by_tissue/
 export COUNTS_NORM_DIR=data/counts_by_tissue/norm
@@ -18,12 +19,20 @@ export GENES_KEEP_LIST=data/genes_to_keep.csv
 export HG38_DIR=data/hg38.fa
 export OUT_AUX=data/aux_inputs/
 
+
+# =============================================================================================
+# GENERATE COUNT TABLES PER TISSUE TYPE
+# =============================================================================================
 # generate the count tables by tissue source; set min/max sample limit
 python tissue_type_parse.py \
      --h5file=$ARCHS4_DATA \
      --savedir=$COUNTS_DIR \
      --min_samples 10 \
      --max_samples 100
+
+# =============================================================================================
+# NORMALIZE COUNT TABLES IN R
+# =============================================================================================
 
 filext="*.csv"
 for f in $COUNTS_DIR$filext
@@ -39,18 +48,50 @@ echo "Plots for count files are saved in $COUNTS_NORM_DIR/plots folder"
 rm -f $COUNTS_DIR$filext
 mv $COUNTS_NORM_DIR/$filext $COUNTS_DIR
 
-# genome_region: either one chromosome: 'chr1' or 'all', or list separated by comma
-python main_input.py \
+# =============================================================================================
+# GENERATE MAIN INPUT FILES
+# =============================================================================================
+# PUT TRAIN/TEST CHR MANUALLY
+# + THE LONGEST GENES (above length_limit) WILL BE PUT IN TEST_OUT DIR
+train_set=( chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 \
+            chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 )
+test_set=( chr21 chr22 chrX chrY )
+
+# TRAIN SET
+for i in "${train_set[@]}"
+do
+   python main_input.py \
      --gencode_list=$GENCODE_LIST \
      --hg38=$HG38_DIR \
-     --genome_region chr21,chr22 \
+     --genome_region $i \
      --genes_to_keep=$GENES_KEEP_LIST \
      --input=$COUNTS_DIR \
      --out_train=$TRAIN_DATA_DIR \
      --out_test=$TEST_DATA_DIR \
-     --test_ratio 0.2 \
-     --context 1000
+     --length_limit 50000 \
+     --context 1000 \
+     --test 0
+done
 
+# TEST SET
+for i in "${test_set[@]}"
+do
+   python main_input.py \
+     --gencode_list=$GENCODE_LIST \
+     --hg38=$HG38_DIR \
+     --genome_region $i \
+     --genes_to_keep=$GENES_KEEP_LIST \
+     --input=$COUNTS_DIR \
+     --out_train=$TRAIN_DATA_DIR \
+     --out_test=$TEST_DATA_DIR \
+     --length_limit 50000 \
+     --context 1000 \
+     --test 1
+done
+
+# =============================================================================================
+# GENERATE AUXILIARY INPUT FILES
+# =============================================================================================
 python aux_input.py \
      --gencode_list=$GENCODE_LIST \
      --rbp_list=$RBP_LIST \
