@@ -2,7 +2,7 @@
 
 # has to be downloaded
 # javascript:downloadFile('https://mssm-seq-matrix.s3.amazonaws.com/human_matrix.h5','human_matrix.h5','8')
-export ARCHS4_DATA=../human_transcript_v8.h5
+export ARCHS4_DATA=data/human_transcript_v8.h5
 export COUNTS_DIR=data/counts_by_tissue/
 export COUNTS_NORM_DIR=data/counts_by_tissue/norm
 export TRANSCRIPT_LEN_DICT=data/transcript_length_dict.jsonl
@@ -25,9 +25,6 @@ python tissue_type_parse.py \
      --min_samples 10 \
      --max_samples 100
 
-source /opt/anaconda3/etc/profile.d/conda.sh
-conda activate py27
-
 filext="*.csv"
 for f in $COUNTS_DIR$filext
 do
@@ -37,8 +34,6 @@ do
   Rscript normalize_counts.r $f $COUNTS_NORM_DIR -2.0
 done
 echo "Plots for count files are saved in $COUNTS_NORM_DIR/plots folder"
-
-conda deactivate
 
 # replacing count tables with new normalized files
 rm -f $COUNTS_DIR$filext
