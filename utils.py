@@ -101,7 +101,6 @@ def make_gene_dict(transcript_file, region):
 
 def construct_library(gene_dict, counts):
     library = {}
-    start_time = time.time()
 
     for sample in counts.index:
         library[sample] = {}
@@ -140,7 +139,6 @@ def construct_library(gene_dict, counts):
                         # normalise to tpkm
                         library[sample][gene]['norm_factor'] += float(counts.at[sample, tr] / l)
 
-    print("All samples calc in {} seconds".format(time.time() - start_time))
     return library
 
 

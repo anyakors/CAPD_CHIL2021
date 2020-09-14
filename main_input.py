@@ -43,7 +43,9 @@ if args.genome_region=='all':
 else:
     region = args.genome_region.split(",")
 
-print("Genome region defined:", region)
+print("====================================================================")
+print("Main inputs generation; genome region defined:", region)
+print("====================================================================")
 
 transcript_file = np.genfromtxt(args.gencode_list, usecols=(1, 2, 3, 4, 5, 9, 10, 12), skip_header=1, dtype='str')
 
@@ -62,7 +64,7 @@ if args.test:
     print("{} genes selected for testing".format(len(gene_dict_test)))
 else:
     gene_dict_train, gene_dict_test = train_test_sep_limit(gene_dict, args.length_limit)
-    print("{} genes selected for training, {} for testing".format(len(gene_dict_train), len(gene_dict_test)))
+    print("{} genes selected for training, {} (longer than threshold) for testing".format(len(gene_dict_train), len(gene_dict_test)))
 
 
 hg38 = {}
@@ -78,14 +80,15 @@ with open(args.hg38, mode='r') as handle:
 
 # construct sample library from count file and save into sep jsonl files
 dirs = os.listdir(args.input)
-print("Input directories:", dirs)
 
 start_time = time.time()
 
 for file in dirs:
     if 'csv' in file:
         counts = pd.read_csv(os.path.join(args.input, file), sep=',', header=0, index_col=0, low_memory=False)
-        print(file, '; shape:', np.shape(counts))
+        print("+++++++++++++++++++++++++++++++++++")
+        print('Generating inputs from', file, '; shape:', np.shape(counts))
+        print("+++++++++++++++++++++++++++++++++++")
 
         if not args.test:
             save_labels_jsonl(counts, gene_dict_train, hg38, args.out_train, args.context, region)
