@@ -2,7 +2,7 @@
 #    install.packages("BiocManager")
 #BiocManager::install(c("rhdf5", "dendextend", "sva", "edgeR", "preprocessCore"))
 
-#install.packages(c("tools", "corrplot", "DMwR2", "colorspace"))
+#install.packages(c("tools", "corrplot", "DMwR2", "colorspace", "data.table"))
 
 library("tools")#
 library("dendextend")#
@@ -11,6 +11,7 @@ library("sva")
 library("edgeR")
 library("corrplot")
 library("colorspace")
+library("data.table")
 
 main <- function() {
 
@@ -18,8 +19,15 @@ main <- function() {
   dir.create(file.path(args[2]), showWarnings = FALSE)
 
   filename <- args[1]
-  res <- read.csv(file = filename)
-  r <- res[,1]#
+  #res <- read.csv(file = filename)
+  #r <- res[,1]#
+  #res <- res[1:nrow(res),2:ncol(res)]
+  #res <- t(res)
+  #colnames(res) <- r
+
+  res <- fread(filename)
+  r <- res[,1]
+  r <- t(r)
   res <- res[1:nrow(res),2:ncol(res)]
   res <- t(res)
   colnames(res) <- r

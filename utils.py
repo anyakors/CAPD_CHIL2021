@@ -34,7 +34,7 @@ def counts_to_csv(f, column_names, indx, tissue, savepath, max_samples=None):
     data = []
     label = tissue_to_label(tissue)
     if max_samples:
-        for i in range(max_samples):
+        for i in range(min(len(indx[tissue]), max_samples)):
             data.append([label+str(i+1)] + list( f['data']['expression'][indx[tissue][i]]))
     else:
         for i in range(len(indx[tissue])):
@@ -43,7 +43,7 @@ def counts_to_csv(f, column_names, indx, tissue, savepath, max_samples=None):
     df = pd.DataFrame(columns=column_names, data=data)
     df = df.set_index('samples')
     df.to_csv(os.path.join(savepath, label+'.csv'))
-    print('{} counts saved into .csv in {}'.format(tissue, savepath))
+    print('{} counts saved to .csv in {}'.format(tissue, savepath))
 
     return
 

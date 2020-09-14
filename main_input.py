@@ -37,7 +37,9 @@ if args.genome_region=='all':
               'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19',
               'chr20', 'chr21', 'chr22', 'chrX', 'chrY']
 else:
-    region = args.genome_region
+    region = args.genome_region.split(",")
+
+print("Genome region defined:", region)
 
 gene_dict = {}
 

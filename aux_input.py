@@ -34,6 +34,8 @@ print('Aux transcripts IDs:', len(l))
 dirs = os.listdir(args.input)
 init = 0
 
+print('Importing count tables from the input path...')
+
 for file in dirs:
     if 'csv' in file:
         if init == 1:
@@ -45,6 +47,8 @@ for file in dirs:
 # normalize to cpm
 #F = counts.sum(axis = 1)/10**6
 #counts = counts.divide(F, axis='index')
+
+print('Normalizing counts to rpkm...')
 
 to_drop = []
 for tr in list(counts.columns):
@@ -69,7 +73,6 @@ for tr in counts.columns:
         counts = counts.drop(columns=tr)
         nf += 1
 
-print("Normalized counts to rpkm")
 print("Transcripts found and retained in the aux counts table:", len(counts.columns))
 
 if not os.path.exists(args.output):
