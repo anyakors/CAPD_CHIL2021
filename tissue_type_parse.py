@@ -88,7 +88,7 @@ min_samples = args.min_samples
 max_samples = args.max_samples
 
 if min_samples:
-    for key in indx.keys():
+    for key in list(indx.keys()):
         if len(indx[key])<min_samples:
             print('{} is not represented enough; excluded'.format(key))
             indx.pop(key)
