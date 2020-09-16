@@ -91,11 +91,11 @@ for file in dirs:
         print("+++++++++++++++++++++++++++++++++++")
 
         if not args.test:
-            save_labels_jsonl(counts, gene_dict_train, hg38, args.out_train, args.context, region)
-            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region,
+            save_labels_jsonl_low_memory(counts, gene_dict_train, hg38, args.out_train, args.context, region)
+            save_labels_jsonl_low_memory(counts, gene_dict_test, hg38, args.out_test, args.context, region,
                                       long_from_train=True)
         else:
-            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region)
+            save_labels_jsonl_low_memory(counts, gene_dict_test, hg38, args.out_test, args.context, region)
 
         print('Saved .jsonl dicts for training/testing with {} label; one file = one sample'.format(file[:3]))
 

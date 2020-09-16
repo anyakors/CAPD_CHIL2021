@@ -19,11 +19,6 @@ main <- function() {
   dir.create(file.path(args[2]), showWarnings = FALSE)
 
   filename <- args[1]
-  #res <- read.csv(file = filename)
-  #r <- res[,1]#
-  #res <- res[1:nrow(res),2:ncol(res)]
-  #res <- t(res)
-  #colnames(res) <- r
 
   res <- fread(filename)
   r <- res[,1]
@@ -52,7 +47,7 @@ main <- function() {
 
   dir.create(file.path(args[2], "plots"), showWarnings = FALSE)
   dir.create(file.path(args[2], "plots", substr(r[1], 1, 3)), showWarnings = FALSE)
-  jpeg(file.path(args[2], "plots", substr(r[1], 1, 3), "corrplot.jpg"))
+  png(file=file.path(args[2], "plots", substr(r[1], 1, 3), "corrplot.png"), width=750, height=750)
   corrplot(cc, tl.col = "black", order = "hclust", hclust.method = "average", addrect = 2, tl.cex = 0.5)
   dev.off()
 
@@ -67,7 +62,7 @@ main <- function() {
   labels_colors(dend) <- series_color[order.dendrogram(dend)]
   dend <- color_branches(dend, h=0.25)
 
-  jpeg(file.path(args[2], "plots", substr(r[1], 1, 3), "dendrogram.jpg"))
+  png(file=file.path(args[2], "plots", substr(r[1], 1, 3), "dendrogram.png"), width=750, height=750)
   par(mar=c(4,1,1,12), cex=0.6)
   plot(dend, horiz=TRUE)
   colored_bars(cbind(clu, series_color), dend, rowLabels = c("Cluster", "Sample"), horiz=TRUE, y_scale=0.05, text_shift=0.1)
@@ -83,17 +78,20 @@ main <- function() {
   cat(paste("Outlier threshold:", sdout, sep=" "))
   cat("\n")
 
-  jpeg(file.path(args[2], "plots", substr(r[1], 1, 3), "outliers.jpg"))
+  #jpeg(file.path(args[2], "plots", substr(r[1], 1, 3), "outliers.jpg"))
+  png(file=file.path(args[2], "plots", substr(r[1], 1, 3), "outliers.png"), width=750, height=750)
   plot(numbersd)
   text(1:ncol(cc), numbersd, labels=colnames(cc), cex=0.9, pos=3)
   abline(h=sdout) 
   dev.off()
 
   outliers = dimnames(res)[[2]][numbersd<sdout] 
-  cat(paste("Dropped", length(outliers), "outliers:", outliers, sep=" "))
+  cat(paste("Dropped", length(outliers), "outliers", sep=" "))
   cat("\n")
-  res <- res[ , -which(colnames(res) %in% outliers)]
+  #res <- res[ , -which(colnames(res) %in% outliers)]
+  res <- res[, !colnames(res) %in% outliers]
   res <- t(res)
+  names(dimnames(res)) <- c("samples", "")
   write.csv(res, file.path(args[2], paste(substr(r[1], 1, 3), ".csv", sep="")))
 
   cat("Saved normalized .csv count table in the out dir")
