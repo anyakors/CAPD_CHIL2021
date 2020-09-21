@@ -2,6 +2,8 @@ from utils import *
 import h5py
 import argparse
 import time
+import random
+import numpy as np
 
 
 def find_indx(all_sources, keyword):
@@ -29,7 +31,19 @@ parser.add_argument("-m", "--max_samples", help="Max samples per tissue",
                     type=int)
 parser.add_argument("-n", "--min_samples", help="Min samples per tissue",
                     type=int)
+
+# ! New args for shuffling samples- start
+parser.add_argument("--seed", default=42, help="Random seed for reproducibility",
+                    type=int)
+parser.add_argument("--shuffle", action="store_true", help="Whether to shuffle samples")
+# ! New args for shuffling samples- end
+
 args = parser.parse_args()
+
+# ! Set random seed for reproducibility- start
+random.seed(args.seed)
+np.random.seed(args.seed)
+# ! Set random seed for reproducibility- end
 
 f = h5py.File(args.h5file, 'r')
 # list of all sample sources and transcripts
@@ -58,6 +72,12 @@ for tissue in tissues:
 indx['AML'] = find_indx(all_sources, ['acute', 'myeloid', 'leukemia'])
 indx['AML'].extend(find_indx(all_sources, 'AML'))
 
+# ! Shuffle sample indices- start
+if args.shuffle:
+    for tissue in indx.keys():
+        random.shuffle(indx[tissue])
+# ! Shuffle sample indices- end
+
 # create a table with all the sample expression arrays (AML):
 # rows - samples, cols - transcripts, elements - No of reads, not normalised
 column_names = ['samples']
@@ -68,9 +88,9 @@ min_samples = args.min_samples
 max_samples = args.max_samples
 
 if min_samples:
-    for key in indx.keys():
+    for key in list(indx.keys()):
         if len(indx[key])<min_samples:
-            print('{} is not represented enough; exluded'.format(key))
+            print('{} is not represented enough; excluded'.format(key))
             indx.pop(key)
 
 for tissue in indx.keys():

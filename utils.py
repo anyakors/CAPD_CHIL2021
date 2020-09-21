@@ -100,9 +100,13 @@ def make_gene_dict(transcript_file, region):
 
 
 def construct_library(gene_dict, counts):
+    print("construct_library len(gene_dict.keys()): ", len(gene_dict.keys()))
+    print("construct_library len(counts.index): ", len(counts.index))
     library = {}
 
-    for sample in counts.index:
+    for sample_ind, sample in enumerate(counts.index):
+        if sample_ind % 20 == 0:
+            print("construct_library sample_ind: ", sample_ind)
         library[sample] = {}
         for gene in gene_dict.keys():
             for tr in gene_dict[gene].keys():
@@ -221,7 +225,9 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='',
     #counts = counts.divide(F, axis='index')
 
     start_time = time.time()
+    print("start construct_library")
     library = construct_library(gene_dict, counts)
+    print("end construct_library")
 
     for sample in library.keys():
         if region:
@@ -232,6 +238,7 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='',
         else:
             filename = sample + '.jsonl'
         with open(os.path.join(out_dir, filename), 'a') as f1:
+            print("opening file to write main input to: ", os.path.join(out_dir, filename))
             # genes
             for gene in library[sample].keys():
                 jsonl_dict = {}
@@ -243,7 +250,9 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='',
 
                 jsonl_dict['exons'] = exons(gene_dict[gene])
 
+                # print("start dumping jsonl to: ", os.path.join(out_dir, filename))
                 json.dump(jsonl_dict, f1)
+                # print("end dumping jsonl to: ", os.path.join(out_dir, filename))
                 f1.write('\n')
 
     if region:
@@ -255,6 +264,7 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='',
         filename = 'gene_dict.jsonl'
     if not os.path.exists(os.path.join(out_dir, filename)):
         with open(os.path.join(out_dir, filename), 'a') as f2:
+            print("opening file to write seq to: ", os.path.join(out_dir, filename))
             for gene in library[sample].keys():
                 gs = int(gene_dict[gene]['global_start'])
                 ge = int(gene_dict[gene]['global_end'])
@@ -263,8 +273,155 @@ def save_labels_jsonl(counts, gene_dict, hg38, out_dir, context=1000, region='',
 
                 gene_jsonl_dict = {}
                 gene_jsonl_dict[gene] = seq
+                print("start dumping gene seq to: ", os.path.join(out_dir, filename))
                 json.dump(gene_jsonl_dict, f2)
+                print("end dumping gene seq to: ", os.path.join(out_dir, filename))
                 f2.write('\n')
 
     print("All samples saved in {} seconds".format(time.time() - start_time))
     return
+
+
+
+def save_labels_jsonl_low_memory(counts, gene_dict, hg38, out_dir, context=1000, region='', long_from_train=False):
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    if region:
+        if isinstance(region, list):
+            region = "_".join(region)
+
+    # normalise to cpm first ALRD NORM IN BATCH NORM R
+    #F = counts.sum(axis=1) / 10 ** 6
+    #counts = counts.divide(F, axis='index')
+
+    start_time = time.time()
+    print("start construct_library")
+    # library = construct_library(gene_dict, counts)
+
+    # Initialize here to use outside the sample loop, at the end of the method
+    library_sample = None
+
+    # adapted from construct_library method: Start
+    for sample_ind, sample in enumerate(counts.index):
+        if sample_ind % 20 == 0:
+            print("construct_library sample_ind: ", sample_ind)
+        library_sample = {}
+        for gene in gene_dict.keys():
+            for tr in gene_dict[gene].keys():
+
+                if tr in counts.columns:
+                    if gene not in library_sample.keys():
+                        library_sample[gene] = {}
+                        library_sample[gene] = {}
+                        length = int(gene_dict[gene]['global_end']) - int(gene_dict[gene]['global_start']) + 1
+                        library_sample[gene]['alabels'] = np.zeros(length)
+                        library_sample[gene]['dlabels'] = np.zeros(length)
+                        library_sample[gene]['norm_factor'] = 0
+                        gs = int(gene_dict[gene]['global_start'])
+                        ge = int(gene_dict[gene]['global_end'])
+                        l = gene_dict[gene][tr]['length']
+                        for s in gene_dict[gene][tr]['starts']:
+                            # normalise to tpkm
+                            library_sample[gene]['alabels'][int(s) - gs] += float(counts.at[sample, tr] / l)
+                        for s in gene_dict[gene][tr]['ends']:
+                            # normalise to tpkm
+                            library_sample[gene]['dlabels'][int(s) - gs] += float(counts.at[sample, tr] / l)
+                        # normalise to tpkm
+                        library_sample[gene]['norm_factor'] += float(counts.at[sample, tr] / l)
+                    else:
+                        gs = int(gene_dict[gene]['global_start'])
+                        ge = int(gene_dict[gene]['global_end'])
+                        l = gene_dict[gene][tr]['length']
+                        for s in gene_dict[gene][tr]['starts']:
+                            # normalise to tpkm
+                            library_sample[gene]['alabels'][int(s) - gs] += float(counts.at[sample, tr] / l)
+                        for s in gene_dict[gene][tr]['ends']:
+                            # normalise to tpkm
+                            library_sample[gene]['dlabels'][int(s) - gs] += float(counts.at[sample, tr] / l)
+                        # normalise to tpkm
+                        library_sample[gene]['norm_factor'] += float(counts.at[sample, tr] / l)
+
+        # adapted from construct_library method: End
+
+        # adapted from save_labels_jsonl method: Start
+        if region:
+            if long_from_train:
+                filename = sample + '_' + region + '_long.jsonl'
+            else:
+                filename = sample + '_' + region + '.jsonl'
+        else:
+            filename = sample + '.jsonl'
+        with open(os.path.join(out_dir, filename), 'a') as f1:
+            print("opening file to write main input to: ", os.path.join(out_dir, filename))
+            # genes
+            for gene in library_sample.keys():
+                jsonl_dict = {}
+                jsonl_dict['gene'] = gene
+
+                c = library_sample[gene]['norm_factor']
+                jsonl_dict['alabels'] = labels_squeeze(library_sample[gene]['alabels'], c)
+                jsonl_dict['dlabels'] = labels_squeeze(library_sample[gene]['dlabels'], c)
+
+                jsonl_dict['exons'] = exons(gene_dict[gene])
+
+                # print("start dumping jsonl to: ", os.path.join(out_dir, filename))
+                json.dump(jsonl_dict, f1)
+                # print("end dumping jsonl to: ", os.path.join(out_dir, filename))
+                f1.write('\n')
+
+
+    # for sample in library.keys():
+    #     if region:
+    #         if long_from_train:
+    #             filename = sample + '_' + region + '_long.jsonl'
+    #         else:
+    #             filename = sample + '_' + region + '.jsonl'
+    #     else:
+    #         filename = sample + '.jsonl'
+    #     with open(os.path.join(out_dir, filename), 'a') as f1:
+    #         print("opening file to write main input to: ", os.path.join(out_dir, filename))
+    #         # genes
+    #         for gene in library[sample].keys():
+    #             jsonl_dict = {}
+    #             jsonl_dict['gene'] = gene
+
+    #             c = library[sample][gene]['norm_factor']
+    #             jsonl_dict['alabels'] = labels_squeeze(library[sample][gene]['alabels'], c)
+    #             jsonl_dict['dlabels'] = labels_squeeze(library[sample][gene]['dlabels'], c)
+
+    #             jsonl_dict['exons'] = exons(gene_dict[gene])
+
+    #             # print("start dumping jsonl to: ", os.path.join(out_dir, filename))
+    #             json.dump(jsonl_dict, f1)
+    #             # print("end dumping jsonl to: ", os.path.join(out_dir, filename))
+    #             f1.write('\n')
+
+    if region:
+        if long_from_train:
+            filename = 'gene_dict' + '_'  + region + '_long.jsonl'
+        else:
+            filename = 'gene_dict' + '_' + region + '.jsonl'
+    else:
+        filename = 'gene_dict.jsonl'
+    if not os.path.exists(os.path.join(out_dir, filename)):
+        with open(os.path.join(out_dir, filename), 'a') as f2:
+            print("opening file to write seq to: ", os.path.join(out_dir, filename))
+            # for gene in library[sample].keys():
+            for gene in library_sample.keys():
+                gs = int(gene_dict[gene]['global_start'])
+                ge = int(gene_dict[gene]['global_end'])
+
+                seq = str(hg38[gene_dict[gene]['chr']][gs - context: ge + context + 1])
+
+                gene_jsonl_dict = {}
+                gene_jsonl_dict[gene] = seq
+                print("start dumping gene seq to: ", os.path.join(out_dir, filename))
+                json.dump(gene_jsonl_dict, f2)
+                print("end dumping gene seq to: ", os.path.join(out_dir, filename))
+                f2.write('\n')
+
+    print("All samples saved in {} seconds".format(time.time() - start_time))
+    return
+
+    # adapted from save_labels_jsonl method: End

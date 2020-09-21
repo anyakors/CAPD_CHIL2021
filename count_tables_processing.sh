@@ -19,6 +19,7 @@ export GENES_KEEP_LIST=data/genes_to_keep.csv
 export HG38_DIR=data/hg38.fa
 export OUT_AUX=data/aux_inputs/
 
+SECONDS=0
 
 # =============================================================================================
 # GENERATE COUNT TABLES PER TISSUE TYPE
@@ -27,12 +28,15 @@ export OUT_AUX=data/aux_inputs/
 python tissue_type_parse.py \
      --h5file=$ARCHS4_DATA \
      --savedir=$COUNTS_DIR \
-     --min_samples 10 \
-     --max_samples 100
+     --min_samples 100 \
+     --max_samples 750 \
+     --shuffle
 
 # =============================================================================================
 # NORMALIZE COUNT TABLES IN R
 # =============================================================================================
+#source /opt/anaconda3/etc/profile.d/conda.sh
+#conda activate py27
 
 filext="*.csv"
 for f in $COUNTS_DIR$filext
@@ -48,14 +52,25 @@ echo "Plots for count files are saved in $COUNTS_NORM_DIR/plots folder"
 rm -f $COUNTS_DIR$filext
 mv $COUNTS_NORM_DIR/$filext $COUNTS_DIR
 
+for f in $COUNTS_DIR$filext
+do
+  sed -i '' 's/""/"samples"/' $f
+done
+
+#conda deactivate
 # =============================================================================================
 # GENERATE MAIN INPUT FILES
 # =============================================================================================
 # PUT TRAIN/TEST CHR MANUALLY
 # + THE LONGEST GENES (above length_limit) WILL BE PUT IN TEST_OUT DIR
-train_set=( chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 \
-            chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 )
-test_set=( chr21 chr22 chrX chrY )
+# train_set=( chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 \
+#             chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 )
+# test_set=( chr21 chr22 chrX chrY )
+
+# Spliceai Train/Test split
+train_set=( chr2 chr4 chr6 chr8 chr10 chr11 chr12 chr13 chr14 chr15 \
+            chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY )
+test_set=( chr1 chr3 chr5 chr7 chr9 )
 
 # TRAIN SET
 for i in "${train_set[@]}"
@@ -99,3 +114,5 @@ python aux_input.py \
      --input=$COUNTS_DIR \
      --tr_dict=$TRANSCRIPT_LEN_DICT \
      --output=$OUT_AUX
+
+echo "OVERALL PROCESSING TIME: $SECONDS sec"
