@@ -19,6 +19,7 @@ export GENES_KEEP_LIST=data/genes_to_keep.csv
 export HG38_DIR=data/hg38.fa
 export OUT_AUX=data/aux_inputs/
 
+
 SECONDS=0
 
 # =============================================================================================
@@ -29,15 +30,12 @@ python tissue_type_parse.py \
      --h5file=$ARCHS4_DATA \
      --savedir=$COUNTS_DIR \
      --min_samples 100 \
-     --max_samples 750 \
+     --max_samples 250 \
      --shuffle
 
 # =============================================================================================
 # NORMALIZE COUNT TABLES IN R
 # =============================================================================================
-#source /opt/anaconda3/etc/profile.d/conda.sh
-#conda activate py27
-
 filext="*.csv"
 for f in $COUNTS_DIR$filext
 do
@@ -57,7 +55,8 @@ do
   sed -i '' 's/""/"samples"/' $f
 done
 
-#conda deactivate
+conda deactivate
+
 # =============================================================================================
 # GENERATE MAIN INPUT FILES
 # =============================================================================================
@@ -107,7 +106,7 @@ done
 # =============================================================================================
 # GENERATE AUXILIARY INPUT FILES
 # =============================================================================================
-python aux_input.py \
+python aux_input_opt.py \
      --gencode_list=$GENCODE_LIST \
      --rbp_list=$RBP_LIST \
      --rmod_list=$RMOD_LIST \

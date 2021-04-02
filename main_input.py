@@ -59,6 +59,48 @@ for key in list(gene_dict.keys()):
 
 print("Omitted genes with missing exon info (GENCODEv26), left:", len(gene_dict.keys()))
 
+
+# Omit genes with sense and antisense strands or those that appear on more than one chromosomes: Start
+gene_sense = {}
+gene_with2sense = []
+for row in transcript_file:
+    gene = row[7]
+    strand = row[2]
+    
+    if gene not in gene_sense:
+        gene_sense[gene] = strand
+    else:
+        existing_strand = gene_sense[gene]
+        if gene not in gene_with2sense and existing_strand != strand:
+            # print("{} gene has both + & - sense transcripts".format(gene))
+            gene_with2sense.append(gene)
+
+
+gene_chr = {}
+gene_on_2om_chrs = []
+for row in transcript_file:
+    gene = row[7]
+    chromosome = row[1]
+    strand = row[2]
+    
+    if gene not in gene_chr:
+        gene_chr[gene] = chromosome
+    else:
+        existing_chr = gene_chr[gene]
+        if gene not in gene_on_2om_chrs and existing_chr != chromosome:
+            # print("{} gene is on more than one chromosome".format(gene))
+            gene_on_2om_chrs.append(gene)
+
+
+for key in list(gene_dict.keys()):
+    if key in gene_with2sense or key in gene_on_2om_chrs:
+        print("genes to omit:", key)
+        gene_dict.pop(key)
+
+# Omit genes with sense and antisense strands or those that appear on more than one chromosomes: End
+
+print("Omitted with sense and antisense strands or those that appear on more than one chromosomes, left:", len(gene_dict.keys()))
+
 if args.test:
     gene_dict_test = gene_dict
     print("{} genes selected for testing".format(len(gene_dict_test)))
@@ -70,6 +112,7 @@ else:
 hg38 = {}
 
 with open(args.hg38, mode='r') as handle:
+    print("Opened hg38 file")
     for record in SeqIO.parse(handle, 'fasta'):
         identifier = record.id
         description = record.description
@@ -91,11 +134,11 @@ for file in dirs:
         print("+++++++++++++++++++++++++++++++++++")
 
         if not args.test:
-            save_labels_jsonl_low_memory(counts, gene_dict_train, hg38, args.out_train, args.context, region)
-            save_labels_jsonl_low_memory(counts, gene_dict_test, hg38, args.out_test, args.context, region,
+            save_labels_jsonl(counts, gene_dict_train, hg38, args.out_train, args.context, region)
+            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region,
                                       long_from_train=True)
         else:
-            save_labels_jsonl_low_memory(counts, gene_dict_test, hg38, args.out_test, args.context, region)
+            save_labels_jsonl(counts, gene_dict_test, hg38, args.out_test, args.context, region)
 
         print('Saved .jsonl dicts for training/testing with {} label; one file = one sample'.format(file[:3]))
 

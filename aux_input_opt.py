@@ -36,26 +36,33 @@ init = 0
 
 print('Importing count tables from the input path...')
 
+
+# ! Optimized to consume lower memory during csv loading: Start
+to_drop = []
 for file in dirs:
     if 'csv' in file:
+        print("opening: ", os.path.join(args.input, file))
         if init == 1:
-            counts = counts.append(pd.read_csv(os.path.join(args.input+file), sep=',', header=0, index_col=0, low_memory=False))
+            new_counts = pd.read_csv(os.path.join(args.input, file), sep=',', header=0, index_col="samples", low_memory=False, usecols=["samples"]+list(counts.columns))
+            counts = counts.append(new_counts)
         else:
-            counts = pd.read_csv(os.path.join(args.input+file), sep=',', header=0, index_col=0, low_memory=False)
+            counts = pd.read_csv(os.path.join(args.input, file), sep=',', header=0, index_col="samples", low_memory=False)
+
+            for tr in list(counts.columns):
+                if tr != "samples" and (tr[:15] not in list(l['transcript_ID'])):
+                    to_drop.append(tr)
+                    
+            counts = counts.drop(columns=to_drop)
             init = 1
+
+del to_drop
+# ! Optimized to consume lower memory during csv loading: End
 
 # normalize to cpm
 #F = counts.sum(axis = 1)/10**6
 #counts = counts.divide(F, axis='index')
 
 print('Normalizing counts to rpkm...')
-
-to_drop = []
-for tr in list(counts.columns):
-    if tr[:15] not in list(l['transcript_ID']):
-        to_drop.append(tr)
-
-counts = counts.drop(columns=to_drop)
 
 tr_dict = {}
 with open(args.tr_dict) as json_file:
